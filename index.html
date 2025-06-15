@@ -248,7 +248,6 @@
         csv += `${key},${s ? formatTime(new Date(s)) : ''},${e ? formatTime(new Date(e)) : ''},${b.toFixed(2)},${net},"${n.replace(/"/g, '""')}"\n`;
       }
 
-      <script>
   function resetCurrentWeek() {
     if (!confirm("Reset this week's data? This won't affect previous history.")) return;
 
@@ -268,7 +267,6 @@
     alert("This week's data has been cleared.");
     updateDisplay();
   }
-</script>
 
       const blob = new Blob([csv], {type: "text/csv"});
       const url = URL.createObjectURL(blob);
