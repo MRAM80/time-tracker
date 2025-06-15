@@ -84,7 +84,7 @@
   </div>
 
   <script>
-    // PIN Management
+    // Initial PIN Setup
     if (!localStorage.getItem("userPin")) {
       document.getElementById("pinSetup").style.display = "block";
     } else {
@@ -106,8 +106,6 @@
       alert("PIN set! Please log in.");
       document.getElementById("pinSetup").style.display = "none";
       document.getElementById("lockScreen").style.display = "block";
-      document.getElementById("newPin").value = "";
-      document.getElementById("confirmPin").value = "";
     }
 
     function checkPIN() {
@@ -117,17 +115,16 @@
         document.getElementById("lockScreen").style.display = "none";
         document.getElementById("app").style.display = "block";
         updateDisplay();
-        document.getElementById("pinInput").value = "";
       } else {
         alert("Incorrect PIN.");
-        document.getElementById("pinInput").value = "";
       }
     }
 
-    // Time Tracking Functions
+    // Helpers
     const formatTime = (d) => d.toTimeString().split(' ')[0].slice(0,5);
     const getTodayKey = () => new Date().toISOString().slice(0,10);
 
+    // Main time tracking
     function startWork() {
       const now = new Date();
       localStorage.setItem(`${getTodayKey()}_start`, now.toISOString());
@@ -149,15 +146,15 @@
     function endBreak() {
       const breakStart = localStorage.getItem(`${getTodayKey()}_breakStart`);
       if (!breakStart) {
-        alert("No break started!");
+        alert("No break in progress.");
         return;
       }
       const now = new Date();
-      const totalBreak = parseFloat(localStorage.getItem(`${getTodayKey()}_break`) || "0");
-      const diff = (now - new Date(breakStart)) / (1000 * 60 * 60);
-      localStorage.setItem(`${getTodayKey()}_break`, (totalBreak + diff).toString());
+      const prevBreak = parseFloat(localStorage.getItem(`${getTodayKey()}_break`) || "0");
+      const breakTime = (now - new Date(breakStart)) / (1000 * 60 * 60);
+      localStorage.setItem(`${getTodayKey()}_break`, (prevBreak + breakTime).toFixed(2));
       localStorage.removeItem(`${getTodayKey()}_breakStart`);
-      alert(`Break ended. Duration: ${diff.toFixed(2)} hrs`);
+      alert(`Break ended: ${breakTime.toFixed(2)} hrs`);
       updateDisplay();
     }
 
@@ -177,6 +174,7 @@
       document.getElementById("startTime").textContent = start ? formatTime(new Date(start)) : '--:--';
       document.getElementById("endTime").textContent = end ? formatTime(new Date(end)) : '--:--';
       document.getElementById("breakTotal").textContent = breakTime.toFixed(2) + ' hrs';
+      document.getElementById("taskNote").value = note;
 
       if (start && end) {
         const workHours = (new Date(end) - new Date(start)) / (1000 * 60 * 60);
@@ -185,8 +183,6 @@
       } else {
         document.getElementById("dailyTotal").textContent = '--';
       }
-
-      document.getElementById("taskNote").value = note;
 
       updateWeeklyTotal();
     }
@@ -222,17 +218,31 @@
     }
 
     function clearData() {
-      if (confirm("Are you sure you want to delete all stored data? This will also remove your PIN.")) {
+      if (confirm("Clear ALL data including PIN and logs?")) {
         localStorage.clear();
-        alert("All data cleared. Reloading page.");
         location.reload();
       }
     }
 
-    function exportCSV() {
-      let csv = "Date,Start Time,End Time,Break Hours,Net Work Hours,Task Note\n";
+    function resetCurrentWeek() {
+      if (!confirm("Reset current week's time entries only?")) return;
       const now = new Date();
-      for (let i = 0; i < 30; i++) { // Export last 30 days
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().slice(0,10);
+        ["_start", "_end", "_break", "_breakStart", "_note"].forEach(suffix => {
+          localStorage.removeItem(key + suffix);
+        });
+      }
+      alert("Current week's time cleared.");
+      updateDisplay();
+    }
+
+    function exportCSV() {
+      let csv = "Date,Start,End,Break Hrs,Net Hrs,Note\n";
+      const now = new Date();
+      for (let i = 0; i < 30; i++) {
         const d = new Date(now);
         d.setDate(d.getDate() - i);
         const key = d.toISOString().slice(0,10);
@@ -242,33 +252,11 @@
         const n = localStorage.getItem(`${key}_note`) || "";
         let net = "";
         if (s && e) {
-          const h = (new Date(e) - new Date(s)) / (1000 * 60 * 60) - b;
-          net = h.toFixed(2);
+          net = ((new Date(e) - new Date(s)) / (1000 * 60 * 60) - b).toFixed(2);
         }
-        csv += `${key},${s ? formatTime(new Date(s)) : ''},${e ? formatTime(new Date(e)) : ''},${b.toFixed(2)},${net},"${n.replace(/"/g, '""')}"\n`;
+        csv += `${key},${s ? formatTime(new Date(s)) : ""},${e ? formatTime(new Date(e)) : ""},${b.toFixed(2)},${net},"${n.replace(/"/g, '""')}"\n`;
       }
-
-  function resetCurrentWeek() {
-    if (!confirm("Reset this week's data? This won't affect previous history.")) return;
-
-    const now = new Date();
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0,10);
-
-      localStorage.removeItem(`${key}_start`);
-      localStorage.removeItem(`${key}_end`);
-      localStorage.removeItem(`${key}_break`);
-      localStorage.removeItem(`${key}_breakStart`);
-      localStorage.removeItem(`${key}_note`);
-    }
-
-    alert("This week's data has been cleared.");
-    updateDisplay();
-  }
-
-      const blob = new Blob([csv], {type: "text/csv"});
+      const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
