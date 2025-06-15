@@ -127,18 +127,7 @@
       updateDisplay();
     }
 
-    function startBreak() {
-      const now = new Date();
-      localStorage.setItem(`${getTodayKey()}_breakStart`, now.toISOString());
-      alert("Break started.");
     }
-
-    function endBreak() {
-      const breakStart = localStorage.getItem(`${getTodayKey()}_breakStart`);
-      if (!breakStart) {
-        alert("No break in progress.");
-        return;
-      }
       const now = new Date();
       const prevBreak = parseFloat(localStorage.getItem(`${getTodayKey()}_break`) || "0");
       const breakTime = (now - new Date(breakStart)) / (1000 * 60 * 60);
@@ -146,12 +135,6 @@
       localStorage.removeItem(`${getTodayKey()}_breakStart`);
       alert(`Break ended: ${breakTime.toFixed(2)} hrs`);
       updateDisplay();
-    }
-
-    function saveNote() {
-      const note = document.getElementById("taskNote").value.trim();
-      localStorage.setItem(`${getTodayKey()}_note`, note);
-      alert("Note saved.");
     }
 
     function updateDisplay() {
