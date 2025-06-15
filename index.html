@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Time Tracker</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    button { padding: 15px 25px; margin: 10px; font-size: 18px; }
+    .log, .summary { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h2>📅 Daily Time Tracker</h2>
+
+  <button onclick="startWork()">Start Work</button>
+  <button onclick="endWork()">End Work</button>
+
+  <div class="log">
+    <p><strong>Start Time:</strong> <span id="startTime">--:--</span></p>
+    <p><strong>End Time:</strong> <span id="endTime">--:--</span></p>
+    <p><strong>Today's Total:</strong> <span id="dailyTotal">--</span></p>
+  </div>
+
+  <div class="summary">
+    <h3>🗓 Weekly Total: <span id="weeklyTotal">--</span></h3>
+  </div>
+
+  <script>
+    const formatTime = (d) => d.toTimeString().split(' ')[0].slice(0,5);
+    const getTodayKey = () => new Date().toISOString().slice(0,10);
+    
+    function startWork() {
+      const now = new Date();
+      localStorage.setItem(`${getTodayKey()}_start`, now.toISOString());
+      updateDisplay();
+    }
+
+    function endWork() {
+      const now = new Date();
+      localStorage.setItem(`${getTodayKey()}_end`, now.toISOString());
+      updateDisplay();
+    }
+
+    function updateDisplay() {
+      const today = getTodayKey();
+      const start = localStorage.getItem(`${today}_start`);
+      const end = localStorage.getItem(`${today}_end`);
+
+      document.getElementById('startTime').textContent = start ? formatTime(new Date(start)) : '--:--';
+      document.getElementById('endTime').textContent = end ? formatTime(new Date(end)) : '--:--';
+
+      if (start && end) {
+        const diff = (new Date(end) - new Date(start)) / (1000 * 60 * 60); // in hours
+        document.getElementById('dailyTotal').textContent = diff.toFixed(2) + ' hrs';
+      } else {
+        document.getElementById('dailyTotal').textContent = '--';
+      }
+
+      updateWeeklyTotal();
+    }
+
+    function updateWeeklyTotal() {
+      const now = new Date();
+      const totalHours = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const day = d.toISOString().slice(0,10);
+        const s = localStorage.getItem(`${day}_start`);
+        const e = localStorage.getItem(`${day}_end`);
+        if (s && e) {
+          return (new Date(e) - new Date(s)) / (1000 * 60 * 60); // hours
+        }
+        return 0;
+      }).reduce((a, b) => a + b, 0);
+
+      document.getElementById('weeklyTotal').textContent = totalHours.toFixed(2) + ' hrs';
+    }
+
+    updateDisplay();
+  </script>
+</body>
+</html>
