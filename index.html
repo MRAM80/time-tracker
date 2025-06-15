@@ -78,6 +78,7 @@
     </div>
 
     <button onclick="exportCSV()">⬇️ Export CSV</button>
+    <button onclick="resetCurrentWeek()">🗓 Reset This Week</button>
     <button onclick="clearData()">🗑 Clear All Data</button>
     <button onclick="toggleDarkMode()">🌓 Toggle Dark Mode</button>
   </div>
@@ -246,6 +247,28 @@
         }
         csv += `${key},${s ? formatTime(new Date(s)) : ''},${e ? formatTime(new Date(e)) : ''},${b.toFixed(2)},${net},"${n.replace(/"/g, '""')}"\n`;
       }
+
+      <script>
+  function resetCurrentWeek() {
+    if (!confirm("Reset this week's data? This won't affect previous history.")) return;
+
+    const now = new Date();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0,10);
+
+      localStorage.removeItem(`${key}_start`);
+      localStorage.removeItem(`${key}_end`);
+      localStorage.removeItem(`${key}_break`);
+      localStorage.removeItem(`${key}_breakStart`);
+      localStorage.removeItem(`${key}_note`);
+    }
+
+    alert("This week's data has been cleared.");
+    updateDisplay();
+  }
+</script>
 
       const blob = new Blob([csv], {type: "text/csv"});
       const url = URL.createObjectURL(blob);
