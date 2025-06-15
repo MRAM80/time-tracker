@@ -5,31 +5,88 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Time Tracker</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
-    button { padding: 15px 25px; margin: 10px; font-size: 18px; }
-    .log, .summary { margin-top: 20px; }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
+      transition: background 0.3s, color 0.3s;
+    }
+    button, input, textarea {
+      padding: 10px 15px;
+      margin: 5px 0;
+      font-size: 16px;
+      width: 100%;
+    }
+    .dark {
+      background: #121212;
+      color: #e0e0e0;
+    }
+    .dark input, .dark button, .dark textarea {
+      background: #1e1e1e;
+      color: white;
+      border: 1px solid #333;
+    }
+    .log, .summary, .breaks, .task-note { margin-top: 20px; }
+    .overtime { color: red; font-weight: bold; }
   </style>
 </head>
 <body>
-  <h2>📅 Daily Time Tracker</h2>
+  <h2>🔒 Time Tracker</h2>
 
-  <button onclick="startWork()">Start Work</button>
-  <button onclick="endWork()">End Work</button>
-
-  <div class="log">
-    <p><strong>Start Time:</strong> <span id="startTime">--:--</span></p>
-    <p><strong>End Time:</strong> <span id="endTime">--:--</span></p>
-    <p><strong>Today's Total:</strong> <span id="dailyTotal">--</span></p>
+  <div id="lockScreen">
+    <input type="password" id="pinInput" placeholder="Enter PIN" />
+    <button onclick="checkPIN()">Unlock</button>
   </div>
 
-  <div class="summary">
-    <h3>🗓 Weekly Total: <span id="weeklyTotal">--</span></h3>
+  <div id="app" style="display:none;">
+
+    <button onclick="startWork()">Start Work</button>
+    <button onclick="endWork()">End Work</button>
+
+    <div class="breaks">
+      <button onclick="startBreak()">Start Break</button>
+      <button onclick="endBreak()">End Break</button>
+    </div>
+
+    <div class="task-note">
+      <textarea id="taskNote" placeholder="Enter task note..."></textarea>
+      <button onclick="saveNote()">Save Note</button>
+    </div>
+
+    <div class="log">
+      <p><strong>Start Time:</strong> <span id="startTime">--:--</span></p>
+      <p><strong>End Time:</strong> <span id="endTime">--:--</span></p>
+      <p><strong>Total Break Time:</strong> <span id="breakTotal">--</span></p>
+      <p><strong>Today's Total:</strong> <span id="dailyTotal">--</span></p>
+    </div>
+
+    <div class="summary">
+      <h3>🗓 Weekly Total: <span id="weeklyTotal">--</span> <span id="overtime"></span></h3>
+    </div>
+
+    <button onclick="exportCSV()">⬇️ Export CSV</button>
+    <button onclick="clearData()">🗑 Clear All Data</button>
+    <button onclick="toggleDarkMode()">🌓 Toggle Dark Mode</button>
   </div>
 
   <script>
+    const pin = "1234"; // Set your custom PIN here
+
+    function checkPIN() {
+      const entered = document.getElementById("pinInput").value;
+      if (entered === pin) {
+        document.getElementById("lockScreen").style.display = "none";
+        document.getElementById("app").style.display = "block";
+        updateDisplay();
+      } else {
+        alert("Incorrect PIN.");
+      }
+    }
+
     const formatTime = (d) => d.toTimeString().split(' ')[0].slice(0,5);
     const getTodayKey = () => new Date().toISOString().slice(0,10);
-    
+
     function startWork() {
       const now = new Date();
       localStorage.setItem(`${getTodayKey()}_start`, now.toISOString());
@@ -42,19 +99,44 @@
       updateDisplay();
     }
 
+    function startBreak() {
+      const now = new Date();
+      localStorage.setItem(`${getTodayKey()}_breakStart`, now.toISOString());
+    }
+
+    function endBreak() {
+      const breakStart = localStorage.getItem(`${getTodayKey()}_breakStart`);
+      if (breakStart) {
+        const now = new Date();
+        const totalBreak = parseFloat(localStorage.getItem(`${getTodayKey()}_break`) || "0");
+        const diff = (now - new Date(breakStart)) / (1000 * 60 * 60);
+        localStorage.setItem(`${getTodayKey()}_break`, (totalBreak + diff).toString());
+        localStorage.removeItem(`${getTodayKey()}_breakStart`);
+        updateDisplay();
+      }
+    }
+
+    function saveNote() {
+      const note = document.getElementById("taskNote").value;
+      localStorage.setItem(`${getTodayKey()}_note`, note);
+    }
+
     function updateDisplay() {
       const today = getTodayKey();
       const start = localStorage.getItem(`${today}_start`);
       const end = localStorage.getItem(`${today}_end`);
+      const breakTime = parseFloat(localStorage.getItem(`${today}_break`) || "0");
 
-      document.getElementById('startTime').textContent = start ? formatTime(new Date(start)) : '--:--';
-      document.getElementById('endTime').textContent = end ? formatTime(new Date(end)) : '--:--';
+      document.getElementById("startTime").textContent = start ? formatTime(new Date(start)) : '--:--';
+      document.getElementById("endTime").textContent = end ? formatTime(new Date(end)) : '--:--';
+      document.getElementById("breakTotal").textContent = breakTime.toFixed(2) + ' hrs';
 
       if (start && end) {
-        const diff = (new Date(end) - new Date(start)) / (1000 * 60 * 60); // in hours
-        document.getElementById('dailyTotal').textContent = diff.toFixed(2) + ' hrs';
+        const workHours = (new Date(end) - new Date(start)) / (1000 * 60 * 60);
+        const net = workHours - breakTime;
+        document.getElementById("dailyTotal").textContent = net.toFixed(2) + ' hrs';
       } else {
-        document.getElementById('dailyTotal').textContent = '--';
+        document.getElementById("dailyTotal").textContent = '--';
       }
 
       updateWeeklyTotal();
@@ -62,22 +144,47 @@
 
     function updateWeeklyTotal() {
       const now = new Date();
-      const totalHours = Array.from({ length: 7 }, (_, i) => {
+      let totalHours = 0;
+      for (let i = 0; i < 7; i++) {
         const d = new Date(now);
         d.setDate(d.getDate() - i);
-        const day = d.toISOString().slice(0,10);
-        const s = localStorage.getItem(`${day}_start`);
-        const e = localStorage.getItem(`${day}_end`);
+        const key = d.toISOString().slice(0,10);
+        const s = localStorage.getItem(`${key}_start`);
+        const e = localStorage.getItem(`${key}_end`);
+        const b = parseFloat(localStorage.getItem(`${key}_break`) || "0");
         if (s && e) {
-          return (new Date(e) - new Date(s)) / (1000 * 60 * 60); // hours
+          const h = (new Date(e) - new Date(s)) / (1000 * 60 * 60) - b;
+          totalHours += h;
         }
-        return 0;
-      }).reduce((a, b) => a + b, 0);
-
-      document.getElementById('weeklyTotal').textContent = totalHours.toFixed(2) + ' hrs';
+      }
+      document.getElementById("weeklyTotal").textContent = totalHours.toFixed(2) + ' hrs';
+      document.getElementById("overtime").textContent = totalHours > 44 ? '⚠️ OVERTIME' : '';
+      document.getElementById("overtime").className = totalHours > 44 ? 'overtime' : '';
     }
 
-    updateDisplay();
-  </script>
-</body>
-</html>
+    function toggleDarkMode() {
+      document.body.classList.toggle("dark");
+    }
+
+    function clearData() {
+      if (confirm("Are you sure you want to delete all stored data?")) {
+        localStorage.clear();
+        location.reload();
+      }
+    }
+
+    function exportCSV() {
+      let csv = "Date,Start,End,Break (hrs),Total (hrs),Note\n";
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key.endsWith("_start")) {
+          const date = key.split("_")[0];
+          const start = localStorage.getItem(`${date}_start`);
+          const end = localStorage.getItem(`${date}_end`) || "";
+          const br = parseFloat(localStorage.getItem(`${date}_break`) || "0");
+          const note = localStorage.getItem(`${date}_note`) || "";
+          let total = "";
+          if (start && end) {
+            total = ((new Date(end) - new Date(start)) / (1000 * 60 * 60) - br).toFixed(2);
+          }
+          csv += `${date},${formatTime(new Date(start))},${end ? formatTime(new Date(end)) : ""},${br.toFixed(2)},${total},${note.replace(/,/g, '
